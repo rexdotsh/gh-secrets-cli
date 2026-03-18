@@ -1,4 +1,4 @@
-# gh-actions-secrets
+# gh-secrets-cli
 
 CLI for setting GitHub Actions secrets from local env files, process env, JSON, or stdin. Built for both humans and AI agents: fast defaults, script-friendly output, and repo auto-detection.
 

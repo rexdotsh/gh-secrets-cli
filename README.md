@@ -1,4 +1,4 @@
-# gh-actions-secrets
+# gh-secrets-cli
 
 GitHub Actions secrets CLI built with Bun and published as a regular Node CLI.
 
@@ -8,9 +8,9 @@ Runtime target: publish a regular Node CLI that also works fine from Bun-driven 
 
 Package and command:
 
-- npm package: `gha-secrets`
-- command: `gha-secrets`
-- one-off usage: `bunx gha-secrets doctor`
+- npm package: `gh-secrets`
+- command: `gh-secrets`
+- one-off usage: `bunx gh-secrets doctor`
 
 What it does:
 
@@ -22,15 +22,15 @@ What it does:
 
 Commands:
 
-- `gha-secrets doctor`
-- `gha-secrets set OPENAI_API_KEY sk-...`
-- `gha-secrets list`
-- `printenv OPENAI_API_KEY | gha-secrets set OPENAI_API_KEY`
-- `gha-secrets set OPENAI_API_KEY --from-env OPENAI_API_KEY`
-- `gha-secrets sync`
-- `gha-secrets sync --from-process --env production`
-- `gha-secrets sync --from-json secrets.json --delete-missing`
-- `cat secrets.json | gha-secrets sync --dry-run --json`
+- `gh-secrets doctor`
+- `gh-secrets set OPENAI_API_KEY sk-...`
+- `gh-secrets list`
+- `printenv OPENAI_API_KEY | gh-secrets set OPENAI_API_KEY`
+- `gh-secrets set OPENAI_API_KEY --from-env OPENAI_API_KEY`
+- `gh-secrets sync`
+- `gh-secrets sync --from-process --env production`
+- `gh-secrets sync --from-json secrets.json --delete-missing`
+- `cat secrets.json | gh-secrets sync --dry-run --json`
 
 Resolution order:
 

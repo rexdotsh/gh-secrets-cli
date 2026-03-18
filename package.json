@@ -1,12 +1,12 @@
 {
-  "name": "gha-secrets",
+  "name": "gh-secrets",
   "version": "0.0.0",
   "description": "CLI for managing GitHub Actions secrets",
   "type": "module",
   "packageManager": "bun@1.3.9",
   "keywords": [
     "github-actions",
-    "gha-secrets",
+    "gh-secrets",
     "github-actions-secrets",
     "github-secrets",
     "actions-secrets",
@@ -23,7 +23,7 @@
     "README.md"
   ],
   "bin": {
-    "gha-secrets": "./dist/index.js"
+    "gh-secrets": "./dist/index.js"
   },
   "scripts": {
     "dev": "bun run --hot --no-clear-screen src/cli.ts",

@@ -15,7 +15,7 @@ import {
   selectManagedNames,
 } from "./core/sync";
 
-const cli = cac("gha-secrets");
+const cli = cac("gh-secrets");
 const wantsJsonOutput = process.argv.includes("--json");
 
 const formatCount = (count: number, noun: string) =>

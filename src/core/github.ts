@@ -43,7 +43,7 @@ const repositorySchema = z.object({
 
 const githubApiOrigin = "https://api.github.com";
 const githubApiVersion = "2026-03-10";
-const userAgent = "gha-secrets";
+const userAgent = "gh-secrets";
 
 const mapSecretSummary = (
   secret: z.infer<typeof secretSchema>

@@ -39,6 +39,9 @@ gh-secrets sync --from-file .env.production
 gh-secrets sync --from-json secrets.json
 gh-secrets sync --from-process
 
+# pipe JSON on stdin
+echo '{"OPENAI_API_KEY":"sk-...","DB_URL":"postgres://..."}' | gh-secrets sync
+
 # filter and prefix
 gh-secrets sync --include "APP_*" --prefix PROD_
 gh-secrets sync --exclude "DEBUG_*"

@@ -37,12 +37,13 @@
     "gh-secrets": "./dist/index.js"
   },
   "scripts": {
-    "dev": "bun run --hot --no-clear-screen src/cli.ts",
     "build": "bun build src/cli.ts --target=node --outfile=dist/index.js --packages=external",
+    "check": "bun test && bun typecheck && bun run build",
+    "dev": "bun run src/cli.ts",
     "prepack": "bun run build",
     "release": "bunx release-it",
-    "release:dry-run": "bunx release-it --dry-run --no-github",
-    "release:version": "bunx release-it --release-version",
+    "release:dry-run": "bun run release -- --dry-run --no-github",
+    "release:version": "bun run release -- --release-version",
     "start": "bun run src/cli.ts",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
     "lint": "bun x ultracite check",

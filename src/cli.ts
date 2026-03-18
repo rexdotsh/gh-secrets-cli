@@ -210,7 +210,17 @@ cli
   });
 
 try {
-  cli.parse(process.argv, { run: false });
+  const parsed = cli.parse(process.argv, { run: false });
+  if (
+    !cli.matchedCommandName &&
+    parsed.args.length === 0 &&
+    !parsed.options.help &&
+    !parsed.options.version
+  ) {
+    cli.outputHelp();
+    process.exit(0);
+  }
+
   await cli.runMatchedCommand();
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);

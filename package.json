@@ -10,6 +10,7 @@
   "bugs": {
     "url": "https://github.com/rexdotsh/gh-secrets-cli/issues"
   },
+  "license": "MIT",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },

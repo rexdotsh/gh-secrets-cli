@@ -1,38 +1,100 @@
-# gh-secrets-cli
+# gh-secrets
 
-GitHub Actions secrets CLI built with Bun and published as a regular Node CLI.
+CLI for managing GitHub Actions secrets.
 
-Main point: manage GitHub Actions secrets fast. Local env files, JSON, stdin, and process env are just input sources.
+```bash
+bunx gh-secrets set OPENAI_API_KEY sk-...
+```
 
-Runtime target: publish a regular Node CLI that also works fine from Bun-driven development workflows.
+## Install
 
-Package and command:
+```bash
+# one-off
+bunx gh-secrets <command>
+npx gh-secrets <command>
 
-- npm package: `gh-secrets`
-- command: `gh-secrets`
-- one-off usage: `bunx gh-secrets doctor`
+# global
+bun add -g gh-secrets
+npm install -g gh-secrets
+```
 
-What it does:
+## Commands
 
-- set one secret quickly from args, stdin, or a local env var
-- bulk sync `.env`, JSON, stdin, or process env into repo secrets
-- target repo secrets by default or environment secrets with `--env`
-- auto-detect the current GitHub repo, but let you override it
-- keep output clean for both humans and AI agents
+### `set` - create or update a secret
 
-Commands:
+```bash
+gh-secrets set SECRET_NAME value
+gh-secrets set SECRET_NAME --from-env SECRET_NAME
+echo "value" | gh-secrets set SECRET_NAME
+```
 
-- `gh-secrets doctor`
-- `gh-secrets set OPENAI_API_KEY sk-...`
-- `gh-secrets list`
-- `printenv OPENAI_API_KEY | gh-secrets set OPENAI_API_KEY`
-- `gh-secrets set OPENAI_API_KEY --from-env OPENAI_API_KEY`
-- `gh-secrets sync`
-- `gh-secrets sync --from-process --env production`
-- `gh-secrets sync --from-json secrets.json --delete-missing`
-- `cat secrets.json | gh-secrets sync --dry-run --json`
+### `sync` - bulk upload secrets
 
-Resolution order:
+```bash
+# from .env files (auto-detected)
+gh-secrets sync
 
-- repo: `--repo`, `GH_REPO`, `GITHUB_REPOSITORY`, local git remote
-- token: `--token`, `GITHUB_TOKEN`, `GH_TOKEN`, `gh auth token`
+# from explicit sources
+gh-secrets sync --from-file .env.production
+gh-secrets sync --from-json secrets.json
+gh-secrets sync --from-process
+
+# filter and prefix
+gh-secrets sync --include "APP_*" --prefix PROD_
+gh-secrets sync --exclude "DEBUG_*"
+
+# remove remote secrets not in local input
+gh-secrets sync --delete-missing --include "APP_*"
+
+# preview without writing
+gh-secrets sync --dry-run
+```
+
+### `list` - show secret names
+
+```bash
+gh-secrets list
+gh-secrets list --env production
+```
+
+### `delete` - remove secrets
+
+```bash
+gh-secrets delete SECRET_A SECRET_B
+```
+
+### `doctor` - check setup
+
+```bash
+gh-secrets doctor
+```
+
+## Repo and token resolution
+
+The CLI auto-detects your repo and token. Override with flags or env vars.
+
+**Repo:** `--repo` > `GH_REPO` > `GITHUB_REPOSITORY` > local git remote
+
+**Token:** `--token` > `GITHUB_TOKEN` > `GH_TOKEN` > `gh auth token`
+
+## Global options
+
+```
+--repo <owner/repo>   Target repository
+--env <name>          Target environment secrets
+--token <token>       GitHub token override
+--json                Machine-readable JSON output
+-y, --yes             Skip confirmation prompts
+```
+
+## Safety
+
+- `set` prompts before overwriting an existing secret
+- `delete` requires confirmation (or `--yes`)
+- `sync` prompts before updating or deleting existing secrets
+- `sync --delete-missing` refuses broad deletes without `--include` or `--prefix` (override with `--yes`)
+- `--json` mode returns structured errors with `error`, `message`, and `hint` fields
+
+## License
+
+MIT

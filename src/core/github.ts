@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { CliError } from "./errors";
 import type { RepoRef } from "./repo-ref";
 
 import { encryptSecretValue } from "./encrypt";
@@ -106,55 +107,74 @@ export class GitHubSecretsClient {
   private async request<Schema extends z.ZodType>(
     path: string,
     schema: Schema,
-    init: RequestInit
+    init: RequestInit,
+    action: string
   ): Promise<z.infer<Schema>> {
     const response = await fetch(`${githubApiOrigin}${path}`, init);
     if (!response.ok) {
-      throw new Error(await readErrorMessage(response));
+      throw new CliError(`Failed to ${action}.`, {
+        code: "github_api_error",
+        hint: await readErrorMessage(response),
+      });
     }
 
     return schema.parse(await response.json());
   }
 
-  private async requestEmpty(path: string, method: string, body?: unknown) {
+  private async requestEmpty(
+    path: string,
+    method: string,
+    action: string,
+    body?: unknown
+  ) {
     const response = await fetch(
       `${githubApiOrigin}${path}`,
       buildRequestInit(this.token, method, body)
     );
     if (!response.ok) {
-      throw new Error(await readErrorMessage(response));
+      throw new CliError(`Failed to ${action}.`, {
+        code: "github_api_error",
+        hint: await readErrorMessage(response),
+      });
     }
 
     return response.status;
   }
 
   getRepository(repo: RepoRef) {
+    const target = `${repo.owner}/${repo.repo}`;
     return this.request(
       `/repos/${repo.owner}/${repo.repo}`,
       repositorySchema,
-      buildRequestInit(this.token, "GET")
+      buildRequestInit(this.token, "GET"),
+      `read repository ${target}`
     );
   }
 
   getPublicKey(scope: SecretScope) {
+    const target = formatSecretScope(scope);
     return this.request(
       `${buildSecretsBasePath(scope)}/public-key`,
       publicKeySchema,
-      buildRequestInit(this.token, "GET")
+      buildRequestInit(this.token, "GET"),
+      `fetch the public key for ${target}`
     );
   }
 
   async getSecretCount(scope: SecretScope) {
+    const target = formatSecretScope(scope);
     const payload = await this.request(
       `${buildSecretsBasePath(scope)}?per_page=1&page=1`,
       listSecretsSchema,
-      buildRequestInit(this.token, "GET")
+      buildRequestInit(this.token, "GET"),
+      `count secrets for ${target}`
     );
 
     return payload.total_count;
   }
 
   async listSecrets(scope: SecretScope, perPage = 100) {
+    const target = formatSecretScope(scope);
     const secrets: SecretSummary[] = [];
     let page = 1;
     let totalCount = 0;
@@ -163,7 +183,8 @@ export class GitHubSecretsClient {
       const payload = await this.request(
         `${buildSecretsBasePath(scope)}?per_page=${perPage}&page=${page}`,
         listSecretsSchema,
-        buildRequestInit(this.token, "GET")
+        buildRequestInit(this.token, "GET"),
+        `list secrets for ${target}`
       );
 
       totalCount = payload.total_count;
@@ -182,12 +203,39 @@ export class GitHubSecretsClient {
     };
   }
 
+  async secretExists(scope: SecretScope, name: string) {
+    const target = formatSecretScope(scope);
+    const response = await fetch(
+      `${githubApiOrigin}${buildSecretsBasePath(scope)}/${encodeURIComponent(name)}`,
+      buildRequestInit(this.token, "GET")
+    );
+
+    if (response.status === 404) {
+      return false;
+    }
+
+    if (!response.ok) {
+      throw new CliError(
+        `Failed to check whether ${name} exists in ${target}.`,
+        {
+          code: "github_api_error",
+          hint: await readErrorMessage(response),
+        }
+      );
+    }
+
+    secretSchema.parse(await response.json());
+    return true;
+  }
+
   async upsertSecret(scope: SecretScope, name: string, value: string) {
+    const target = formatSecretScope(scope);
     const publicKey = await this.getPublicKey(scope);
     const encryptedValue = await encryptSecretValue(value, publicKey.key);
     const status = await this.requestEmpty(
       `${buildSecretsBasePath(scope)}/${encodeURIComponent(name)}`,
       "PUT",
+      `set secret ${name} in ${target}`,
       {
         encrypted_value: encryptedValue,
         key_id: publicKey.key_id,
@@ -201,9 +249,11 @@ export class GitHubSecretsClient {
   }
 
   async deleteSecret(scope: SecretScope, name: string) {
+    const target = formatSecretScope(scope);
     await this.requestEmpty(
       `${buildSecretsBasePath(scope)}/${encodeURIComponent(name)}`,
-      "DELETE"
+      "DELETE",
+      `delete secret ${name} from ${target}`
     );
   }
 }

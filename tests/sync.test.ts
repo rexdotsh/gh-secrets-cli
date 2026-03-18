@@ -1,6 +1,11 @@
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, test } from "bun:test";
 
 import {
+  loadSyncEntries,
   parseDotenvSecrets,
   parseJsonSecrets,
   planSecretSync,
@@ -24,6 +29,21 @@ describe("sync parsing", () => {
       { name: "C", source: "secrets.json", value: "true" },
       { name: "D", source: "secrets.json", value: "" },
     ]);
+  });
+
+  test("wraps invalid json file errors clearly", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "gh-secrets-"));
+    const file = join(directory, "bad.json");
+    await writeFile(file, '{"A": }');
+
+    await expect(
+      loadSyncEntries({
+        fromJson: [file],
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_json_input",
+      message: `Failed to parse ${file} as JSON secrets.`,
+    });
   });
 });
 

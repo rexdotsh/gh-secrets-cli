@@ -17,7 +17,7 @@
     }
   },
   "hooks": {
-    "before:init": ["bun test", "bun typecheck"],
+    "before:init": "bun run check",
     "after:git:release": "npm publish"
   }
 }

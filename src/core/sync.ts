@@ -37,6 +37,12 @@ type SyncSourceOptions = {
 
 type SyncFilters = Pick<SyncSourceOptions, "exclude" | "include" | "prefix">;
 
+const rethrowCliError = (error: unknown) => {
+  if (error instanceof CliError) {
+    throw error;
+  }
+};
+
 const jsonSecretsSchema = z.record(
   z.string(),
   z.union([z.string(), z.number(), z.boolean(), z.null()])
@@ -61,7 +67,7 @@ const coerceSecretValue = (value: string | number | boolean | null) => {
 
 const toArray = (value: string | string[] | undefined) => {
   if (Array.isArray(value)) {
-    return value;
+    return value.filter((entry): entry is string => Boolean(entry));
   }
 
   return value ? [value] : [];
@@ -69,6 +75,23 @@ const toArray = (value: string | string[] | undefined) => {
 
 const createMatcher = (patterns: string[], fallback: boolean) =>
   patterns.length ? picomatch(patterns, { nocase: true }) : () => fallback;
+
+const normalizeSecretName = (name: string, prefix: string) =>
+  assertSecretName(`${prefix}${name}`);
+
+const createManagedNameMatcher = (filters: SyncFilters) => {
+  const matchesInclude = createMatcher(toArray(filters.include), true);
+  const matchesExclude = createMatcher(toArray(filters.exclude), false);
+
+  return (name: string) => {
+    const normalized = normalizeSecretName(name, filters.prefix ?? "");
+    if (!matchesInclude(normalized) || matchesExclude(normalized)) {
+      return null;
+    }
+
+    return normalized;
+  };
+};
 
 const normalizeEntries = (
   entries: SecretEntry[],
@@ -81,7 +104,7 @@ const normalizeEntries = (
   const merged = new Map<string, SecretEntry>();
 
   for (const entry of entries) {
-    const name = assertSecretName(`${prefix}${entry.name}`);
+    const name = normalizeSecretName(entry.name, prefix);
     if (!matchesInclude(name) || matchesExclude(name)) {
       continue;
     }
@@ -95,17 +118,14 @@ const normalizeEntries = (
   return [...merged.values()];
 };
 
-export const selectManagedNames = (names: string[], filters: SyncFilters) =>
-  normalizeEntries(
-    names.map((name) => ({
-      name,
-      source: "remote",
-      value: "",
-    })),
-    filters.prefix ?? "",
-    toArray(filters.include),
-    toArray(filters.exclude)
-  ).map((entry) => entry.name);
+export const selectManagedNames = (names: string[], filters: SyncFilters) => {
+  const matchesManagedName = createManagedNameMatcher(filters);
+
+  return names.flatMap((name) => {
+    const normalized = matchesManagedName(name);
+    return normalized ? [normalized] : [];
+  });
+};
 
 const loadEntriesFromFiles = async (
   paths: string[],
@@ -114,7 +134,14 @@ const loadEntriesFromFiles = async (
   const entries: SecretEntry[] = [];
 
   for (const path of paths) {
-    entries.push(...parser(await readFile(path, "utf8"), path));
+    try {
+      entries.push(...parser(await readFile(path, "utf8"), path));
+    } catch (error) {
+      rethrowCliError(error);
+      throw new CliError(`Failed to read ${path}.`, {
+        code: "input_read_error",
+      });
+    }
   }
 
   return entries;
@@ -129,13 +156,21 @@ export const parseJsonSecrets = (
   text: string,
   source: string
 ): SecretEntry[] => {
-  const parsed = jsonSecretsSchema.parse(JSON.parse(text));
+  try {
+    const parsed = jsonSecretsSchema.parse(JSON.parse(text));
 
-  return Object.entries(parsed).map(([name, value]) => ({
-    name,
-    source,
-    value: coerceSecretValue(value),
-  }));
+    return Object.entries(parsed).map(([name, value]) => ({
+      name,
+      source,
+      value: coerceSecretValue(value),
+    }));
+  } catch (error) {
+    rethrowCliError(error);
+    throw new CliError(`Failed to parse ${source} as JSON secrets.`, {
+      code: "invalid_json_input",
+      hint: 'Expected a JSON object like {"NAME":"value"}.',
+    });
+  }
 };
 
 export const parseDotenvSecrets = (
@@ -223,12 +258,15 @@ export const loadSyncEntries = async (
   }
 
   if (!hasExplicitSources && !stdin) {
-    throw new CliError(
-      "No input secrets found. Add a .env file, pipe JSON or dotenv on stdin, or pass --from-file, --from-json, or --from-process."
-    );
+    throw new CliError("No input secrets found.", {
+      code: "no_sync_input",
+      hint: "Add a .env file, pipe JSON or dotenv on stdin, or pass --from-file, --from-json, or --from-process.",
+    });
   }
 
-  throw new CliError("No secrets matched the selected sync filters.");
+  throw new CliError("No secrets matched the selected sync filters.", {
+    code: "no_matching_secrets",
+  });
 };
 
 export const planSecretSync = (

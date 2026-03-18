@@ -8,13 +8,18 @@ export const resolveSecretValue = async (
   fromEnv: string | undefined
 ) => {
   if (value !== undefined && fromEnv) {
-    throw new CliError("Pass either a value argument or --from-env, not both.");
+    throw new CliError("Conflicting secret value sources.", {
+      code: "conflicting_secret_value_source",
+      hint: "Pass either a value argument or --from-env, not both.",
+    });
   }
 
   if (fromEnv) {
     const resolved = process.env[fromEnv];
     if (resolved === undefined) {
-      throw new CliError(`Missing local env var: ${fromEnv}`);
+      throw new CliError(`Missing local env var: ${fromEnv}.`, {
+        code: "missing_local_env",
+      });
     }
 
     return resolved;
@@ -28,7 +33,8 @@ export const resolveSecretValue = async (
     return stripFinalLineBreak(await readStdin());
   }
 
-  throw new CliError(
-    "Missing secret value. Pass it as an argument, use --from-env, or pipe it on stdin."
-  );
+  throw new CliError("Missing secret value.", {
+    code: "missing_secret_value",
+    hint: "Pass it as an argument, use --from-env, or pipe it on stdin.",
+  });
 };

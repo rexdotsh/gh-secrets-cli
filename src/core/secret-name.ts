@@ -6,15 +6,17 @@ const reservedSecretPrefix = "GITHUB_";
 export const assertSecretName = (value: string) => {
   const normalized = value.trim().toUpperCase();
   if (!secretNamePattern.test(normalized)) {
-    throw new CliError(
-      `Invalid secret name: ${value}. Use letters, numbers, and underscores, and do not start with a number.`
-    );
+    throw new CliError(`Invalid secret name: ${value}.`, {
+      code: "invalid_secret_name",
+      hint: "Use letters, numbers, and underscores, and do not start with a number.",
+    });
   }
 
   if (normalized.startsWith(reservedSecretPrefix)) {
-    throw new CliError(
-      `Invalid secret name: ${value}. GitHub Actions secrets cannot start with ${reservedSecretPrefix}.`
-    );
+    throw new CliError(`Invalid secret name: ${value}.`, {
+      code: "invalid_secret_name",
+      hint: `GitHub Actions secrets cannot start with ${reservedSecretPrefix}.`,
+    });
   }
 
   return normalized;

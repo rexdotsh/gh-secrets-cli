@@ -44,7 +44,8 @@ export const resolveAuthToken = (explicit?: string): ResolvedToken => {
     };
   }
 
-  throw new CliError(
-    "Missing GitHub token. Pass --token, set GITHUB_TOKEN or GH_TOKEN, or log in with gh auth login."
-  );
+  throw new CliError("Missing GitHub token.", {
+    code: "missing_token",
+    hint: "Pass --token, set GITHUB_TOKEN or GH_TOKEN, or log in with gh auth login.",
+  });
 };

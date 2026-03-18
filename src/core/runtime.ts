@@ -25,9 +25,10 @@ type CommandRuntime = {
 export const resolveRuntime = (options: GlobalOptions): CommandRuntime => {
   const repo = resolveRepoRef(options.repo);
   if (!repo) {
-    throw new CliError(
-      "Missing GitHub repo. Pass --repo owner/repo, set GH_REPO or GITHUB_REPOSITORY, or run inside a git checkout with a GitHub remote."
-    );
+    throw new CliError("Missing GitHub repo.", {
+      code: "missing_repo",
+      hint: "Pass --repo owner/repo, set GH_REPO or GITHUB_REPOSITORY, or run inside a git checkout with a GitHub remote.",
+    });
   }
 
   const token = resolveAuthToken(options.token);

@@ -29,7 +29,7 @@ type ConfirmConfig = {
   requireYesWithoutPrompt?: boolean;
 };
 
-export type CliDependencies = {
+type CliDependencies = {
   confirmAction: typeof confirmAction;
   isInteractiveSession: typeof isInteractiveSession;
   printJson: typeof printJson;
@@ -110,7 +110,7 @@ const hasScopedDeleteFilters = (options: {
   prefix?: string;
 }) => Boolean(options.prefix || options.include?.length);
 
-export const createCli = (overrides: Partial<CliDependencies> = {}) => {
+const createCli = (overrides: Partial<CliDependencies> = {}) => {
   const dependencies = {
     ...defaultDependencies,
     ...overrides,

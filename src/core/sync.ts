@@ -181,10 +181,7 @@ const readProcessEnvEntries = (): SecretEntry[] =>
     value === undefined ? [] : [{ name, source: "process.env", value }]
   );
 
-export const parseJsonSecrets = (
-  text: string,
-  source: string
-): SecretEntry[] => {
+const parseJsonSecrets = (text: string, source: string): SecretEntry[] => {
   try {
     const parsed = jsonSecretsSchema.parse(JSON.parse(text));
 
@@ -202,10 +199,7 @@ export const parseJsonSecrets = (
   }
 };
 
-export const parseDotenvSecrets = (
-  text: string,
-  source: string
-): SecretEntry[] => {
+const parseDotenvSecrets = (text: string, source: string): SecretEntry[] => {
   return Object.entries(parseDotenv(text)).map(([name, value]) => ({
     name,
     source,

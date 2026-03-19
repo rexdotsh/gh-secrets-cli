@@ -4,10 +4,12 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { runCli, type CliDependencies } from "../src/app";
-import type { CommandRuntime } from "../src/core/runtime";
+import { runCli } from "../src/app";
+import type { resolveRuntime } from "../src/core/runtime";
 
 const createArgv = (...args: string[]) => ["node", "gh-secrets", ...args];
+type CliOverrides = NonNullable<Parameters<typeof runCli>[1]>;
+type CommandRuntime = ReturnType<typeof resolveRuntime>;
 
 const createHarness = (
   options: {
@@ -66,7 +68,7 @@ const createHarness = (
     ...(options.runtime ?? {}),
   };
 
-  const dependencies: Partial<CliDependencies> = {
+  const dependencies: CliOverrides = {
     confirmAction: (message) => {
       prompts.push(message);
       return Promise.resolve(options.confirmResult ?? true);

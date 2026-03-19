@@ -6,28 +6,28 @@ import { describe, expect, test } from "bun:test";
 
 import {
   loadSyncEntries,
-  parseDotenvSecrets,
-  parseJsonSecrets,
   planSecretSync,
   selectManagedNames,
 } from "../src/core/sync";
 
 describe("sync parsing", () => {
-  test("parses dotenv secrets", () => {
-    expect(parseDotenvSecrets("A=1\nB=2\n", ".env")).toEqual([
-      { name: "A", source: ".env", value: "1" },
-      { name: "B", source: ".env", value: "2" },
+  test("parses dotenv secrets from stdin", async () => {
+    await expect(loadSyncEntries({ stdin: "A=1\nB=2\n" })).resolves.toEqual([
+      { name: "A", source: "stdin", value: "1" },
+      { name: "B", source: "stdin", value: "2" },
     ]);
   });
 
-  test("parses json secrets", () => {
+  test("parses json secrets from stdin", async () => {
     expect(
-      parseJsonSecrets('{"A":"1","B":2,"C":true,"D":null}', "secrets.json")
+      await loadSyncEntries({
+        stdin: '{"A":"1","B":2,"C":true,"D":null}',
+      })
     ).toEqual([
-      { name: "A", source: "secrets.json", value: "1" },
-      { name: "B", source: "secrets.json", value: "2" },
-      { name: "C", source: "secrets.json", value: "true" },
-      { name: "D", source: "secrets.json", value: "" },
+      { name: "A", source: "stdin", value: "1" },
+      { name: "B", source: "stdin", value: "2" },
+      { name: "C", source: "stdin", value: "true" },
+      { name: "D", source: "stdin", value: "" },
     ]);
   });
 

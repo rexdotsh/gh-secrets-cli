@@ -65,27 +65,53 @@ const coerceSecretValue = (value: string | number | boolean | null) => {
   return String(value);
 };
 
+const isOptionValue = (value: string | undefined): value is string =>
+  Boolean(value) && value !== "undefined";
+
 const toArray = (value: string | string[] | undefined) => {
   if (Array.isArray(value)) {
-    return value.filter((entry): entry is string => Boolean(entry));
+    return value.filter(isOptionValue);
   }
 
-  return value ? [value] : [];
+  return isOptionValue(value) ? [value] : [];
 };
 
 const createMatcher = (patterns: string[], fallback: boolean) =>
   patterns.length ? picomatch(patterns, { nocase: true }) : () => fallback;
 
-const normalizeSecretName = (name: string, prefix: string) =>
+const normalizeSecretPrefix = (prefix: string) =>
+  prefix ? assertSecretName(prefix) : "";
+
+const normalizeSourceName = (name: string) => assertSecretName(name);
+
+const applySecretPrefix = (name: string, prefix: string) =>
   assertSecretName(`${prefix}${name}`);
 
+const stripSecretPrefix = (name: string, prefix: string) => {
+  if (!prefix) {
+    return name;
+  }
+
+  if (!name.startsWith(prefix) || name.length === prefix.length) {
+    return null;
+  }
+
+  return name.slice(prefix.length);
+};
+
 const createManagedNameMatcher = (filters: SyncFilters) => {
+  const prefix = normalizeSecretPrefix(filters.prefix ?? "");
   const matchesInclude = createMatcher(toArray(filters.include), true);
   const matchesExclude = createMatcher(toArray(filters.exclude), false);
 
   return (name: string) => {
-    const normalized = normalizeSecretName(name, filters.prefix ?? "");
-    if (!matchesInclude(normalized) || matchesExclude(normalized)) {
+    const normalized = normalizeSourceName(name);
+    const sourceName = stripSecretPrefix(normalized, prefix);
+    if (
+      sourceName === null ||
+      !matchesInclude(sourceName) ||
+      matchesExclude(sourceName)
+    ) {
       return null;
     }
 
@@ -99,15 +125,18 @@ const normalizeEntries = (
   include: string[],
   exclude: string[]
 ) => {
+  const normalizedPrefix = normalizeSecretPrefix(prefix);
   const matchesInclude = createMatcher(include, true);
   const matchesExclude = createMatcher(exclude, false);
   const merged = new Map<string, SecretEntry>();
 
   for (const entry of entries) {
-    const name = normalizeSecretName(entry.name, prefix);
-    if (!matchesInclude(name) || matchesExclude(name)) {
+    const sourceName = normalizeSourceName(entry.name);
+    if (!matchesInclude(sourceName) || matchesExclude(sourceName)) {
       continue;
     }
+
+    const name = applySecretPrefix(sourceName, normalizedPrefix);
 
     merged.set(name, {
       ...entry,

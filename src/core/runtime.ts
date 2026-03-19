@@ -15,7 +15,7 @@ type GlobalOptions = {
   token?: string;
 };
 
-type CommandRuntime = {
+export type CommandRuntime = {
   client: GitHubSecretsClient;
   repo: RepoRef;
   scope: SecretScope;

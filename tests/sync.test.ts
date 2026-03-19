@@ -45,6 +45,35 @@ describe("sync parsing", () => {
       message: `Failed to parse ${file} as JSON secrets.`,
     });
   });
+
+  test("ignores CAC undefined sentinels for omitted array options", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "gh-secrets-"));
+    const file = join(directory, ".env");
+    await writeFile(file, "A=1\n");
+
+    await expect(
+      loadSyncEntries({
+        exclude: ["undefined"],
+        fromFile: [file],
+        fromJson: ["undefined"],
+        include: ["undefined"],
+      })
+    ).resolves.toEqual([{ name: "A", source: file, value: "1" }]);
+  });
+
+  test("filters source names before applying a prefix", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "gh-secrets-"));
+    const file = join(directory, ".env");
+    await writeFile(file, "APP_KEY=1\nDEBUG_KEY=2\n");
+
+    await expect(
+      loadSyncEntries({
+        fromFile: [file],
+        include: ["APP_*"],
+        prefix: "prod_",
+      })
+    ).resolves.toEqual([{ name: "PROD_APP_KEY", source: file, value: "1" }]);
+  });
 });
 
 describe("sync planning", () => {
@@ -55,6 +84,16 @@ describe("sync planning", () => {
         prefix: "",
       })
     ).toEqual(["APP_A", "APP_OLD"]);
+  });
+
+  test("matches remote managed names against the unprefixed source name", () => {
+    expect(
+      selectManagedNames(["PROD_APP_A", "PROD_DEBUG_A", "OTHER_A"], {
+        exclude: ["DEBUG_*"],
+        include: ["APP_*"],
+        prefix: "prod_",
+      })
+    ).toEqual(["PROD_APP_A"]);
   });
 
   test("classifies create, update, and delete work", () => {
@@ -72,6 +111,29 @@ describe("sync planning", () => {
       upserts: [
         { action: "create", name: "A", source: ".env", value: "1" },
         { action: "update", name: "B", source: ".env", value: "2" },
+      ],
+    });
+  });
+
+  test("keeps prefixed remote names aligned with prefixed local entries", () => {
+    expect(
+      planSecretSync(
+        [{ name: "PROD_APP_A", source: ".env", value: "1" }],
+        selectManagedNames(["PROD_APP_A", "PROD_APP_OLD"], {
+          include: ["APP_*"],
+          prefix: "prod_",
+        }),
+        true
+      )
+    ).toEqual({
+      deletes: ["PROD_APP_OLD"],
+      upserts: [
+        {
+          action: "update",
+          name: "PROD_APP_A",
+          source: ".env",
+          value: "1",
+        },
       ],
     });
   });

@@ -10,6 +10,20 @@ import {
   selectManagedNames,
 } from "../src/core/sync";
 
+const writeTempEnv = async (content: string) => {
+  const directory = await mkdtemp(join(tmpdir(), "gh-secrets-"));
+  const file = join(directory, ".env");
+  await writeFile(file, content);
+  return file;
+};
+
+const writeTempJson = async (content: string) => {
+  const directory = await mkdtemp(join(tmpdir(), "gh-secrets-"));
+  const file = join(directory, "bad.json");
+  await writeFile(file, content);
+  return file;
+};
+
 describe("sync parsing", () => {
   test("parses dotenv secrets from stdin", async () => {
     await expect(loadSyncEntries({ stdin: "A=1\nB=2\n" })).resolves.toEqual([
@@ -32,9 +46,7 @@ describe("sync parsing", () => {
   });
 
   test("wraps invalid json file errors clearly", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "gh-secrets-"));
-    const file = join(directory, "bad.json");
-    await writeFile(file, '{"A": }');
+    const file = await writeTempJson('{"A": }');
 
     await expect(
       loadSyncEntries({
@@ -47,9 +59,7 @@ describe("sync parsing", () => {
   });
 
   test("ignores CAC undefined sentinels for omitted array options", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "gh-secrets-"));
-    const file = join(directory, ".env");
-    await writeFile(file, "A=1\n");
+    const file = await writeTempEnv("A=1\n");
 
     await expect(
       loadSyncEntries({
@@ -62,9 +72,7 @@ describe("sync parsing", () => {
   });
 
   test("filters source names before applying a prefix", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "gh-secrets-"));
-    const file = join(directory, ".env");
-    await writeFile(file, "APP_KEY=1\nDEBUG_KEY=2\n");
+    const file = await writeTempEnv("APP_KEY=1\nDEBUG_KEY=2\n");
 
     await expect(
       loadSyncEntries({

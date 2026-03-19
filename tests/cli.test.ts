@@ -5,11 +5,37 @@ import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 
 import { runCli } from "../src/app";
-import type { resolveRuntime } from "../src/core/runtime";
 
 const createArgv = (...args: string[]) => ["node", "gh-secrets", ...args];
 type CliOverrides = NonNullable<Parameters<typeof runCli>[1]>;
-type CommandRuntime = ReturnType<typeof resolveRuntime>;
+type CommandRuntime = ReturnType<NonNullable<CliOverrides["resolveRuntime"]>>;
+
+const repoScope = { owner: "acme", repo: "app" } as const;
+const secretTimestamp = "2026-03-19T00:00:00Z";
+const confirmationRequiredJson = {
+  error: "confirmation_required",
+  hint: "Re-run with --yes.",
+  message: "Refusing to continue without confirmation.",
+};
+
+const listedSecret = (name: string) => ({
+  createdAt: secretTimestamp,
+  name,
+  updatedAt: secretTimestamp,
+});
+
+const listedSecrets = (...names: string[]) =>
+  Promise.resolve({
+    totalCount: names.length,
+    secrets: names.map(listedSecret),
+  });
+
+const writeTempEnv = async (content: string) => {
+  const directory = await mkdtemp(join(tmpdir(), "gh-secrets-"));
+  const file = join(directory, ".env");
+  await writeFile(file, content);
+  return file;
+};
 
 const createHarness = (
   options: {
@@ -62,8 +88,8 @@ const createHarness = (
 
   const runtime: CommandRuntime = {
     client,
-    repo: { owner: "acme", repo: "app" },
-    scope: { owner: "acme", repo: "app" },
+    repo: repoScope,
+    scope: repoScope,
     tokenSource: "option",
     ...(options.runtime ?? {}),
   };
@@ -123,20 +149,10 @@ describe("cli commands", () => {
   test("list emits json output", async () => {
     const harness = createHarness({
       client: {
-        listSecrets: () =>
-          Promise.resolve({
-            totalCount: 1,
-            secrets: [
-              {
-                createdAt: "2026-03-19T00:00:00Z",
-                name: "API_KEY",
-                updatedAt: "2026-03-19T00:00:00Z",
-              },
-            ],
-          }),
+        listSecrets: () => listedSecrets("API_KEY"),
       },
       runtime: {
-        scope: { owner: "acme", repo: "app", environment: "prod" },
+        scope: { ...repoScope, environment: "prod" },
       },
     });
 
@@ -148,15 +164,9 @@ describe("cli commands", () => {
     expect(exitCode).toBe(0);
     expect(harness.jsonValues).toEqual([
       {
-        scope: { owner: "acme", repo: "app", environment: "prod" },
+        scope: { ...repoScope, environment: "prod" },
         totalCount: 1,
-        secrets: [
-          {
-            createdAt: "2026-03-19T00:00:00Z",
-            name: "API_KEY",
-            updatedAt: "2026-03-19T00:00:00Z",
-          },
-        ],
+        secrets: [listedSecret("API_KEY")],
       },
     ]);
   });
@@ -216,38 +226,15 @@ describe("cli commands", () => {
     );
 
     expect(exitCode).toBe(1);
-    expect(harness.jsonValues).toEqual([
-      {
-        error: "confirmation_required",
-        hint: "Re-run with --yes.",
-        message: "Refusing to continue without confirmation.",
-      },
-    ]);
+    expect(harness.jsonValues).toEqual([confirmationRequiredJson]);
   });
 
   test("sync dry-run honors source filters before prefixing", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "gh-secrets-"));
-    const file = join(directory, ".env");
-    await writeFile(file, "APP_KEY=1\nDEBUG_KEY=2\n");
+    const file = await writeTempEnv("APP_KEY=1\nDEBUG_KEY=2\n");
 
     const harness = createHarness({
       client: {
-        listSecrets: () =>
-          Promise.resolve({
-            totalCount: 2,
-            secrets: [
-              {
-                createdAt: "2026-03-19T00:00:00Z",
-                name: "PROD_APP_KEY",
-                updatedAt: "2026-03-19T00:00:00Z",
-              },
-              {
-                createdAt: "2026-03-19T00:00:00Z",
-                name: "PROD_APP_OLD",
-                updatedAt: "2026-03-19T00:00:00Z",
-              },
-            ],
-          }),
+        listSecrets: () => listedSecrets("PROD_APP_KEY", "PROD_APP_OLD"),
       },
     });
 
@@ -277,17 +264,7 @@ describe("cli commands", () => {
   test("sync refuses broad delete-missing runs without yes", async () => {
     const harness = createHarness({
       client: {
-        listSecrets: () =>
-          Promise.resolve({
-            totalCount: 1,
-            secrets: [
-              {
-                createdAt: "2026-03-19T00:00:00Z",
-                name: "APP_OLD",
-                updatedAt: "2026-03-19T00:00:00Z",
-              },
-            ],
-          }),
+        listSecrets: () => listedSecrets("APP_OLD"),
       },
       stdin: "APP_KEY=1\n",
     });
@@ -307,22 +284,7 @@ describe("cli commands", () => {
   test("sync applies updates and deletes when confirmed with yes", async () => {
     const harness = createHarness({
       client: {
-        listSecrets: () =>
-          Promise.resolve({
-            totalCount: 2,
-            secrets: [
-              {
-                createdAt: "2026-03-19T00:00:00Z",
-                name: "APP_KEY",
-                updatedAt: "2026-03-19T00:00:00Z",
-              },
-              {
-                createdAt: "2026-03-19T00:00:00Z",
-                name: "APP_OLD",
-                updatedAt: "2026-03-19T00:00:00Z",
-              },
-            ],
-          }),
+        listSecrets: () => listedSecrets("APP_KEY", "APP_OLD"),
         upsertSecret: (_scope, name, value) => {
           harness.upsertCalls.push({ name, value });
           return Promise.resolve({ created: false, name });
@@ -347,17 +309,7 @@ describe("cli commands", () => {
   test("sync json mode still requires yes for destructive plans", async () => {
     const harness = createHarness({
       client: {
-        listSecrets: () =>
-          Promise.resolve({
-            totalCount: 1,
-            secrets: [
-              {
-                createdAt: "2026-03-19T00:00:00Z",
-                name: "APP_KEY",
-                updatedAt: "2026-03-19T00:00:00Z",
-              },
-            ],
-          }),
+        listSecrets: () => listedSecrets("APP_KEY"),
       },
       stdin: "APP_KEY=1\n",
     });
@@ -368,13 +320,7 @@ describe("cli commands", () => {
     );
 
     expect(exitCode).toBe(1);
-    expect(harness.jsonValues).toEqual([
-      {
-        error: "confirmation_required",
-        hint: "Re-run with --yes.",
-        message: "Refusing to continue without confirmation.",
-      },
-    ]);
+    expect(harness.jsonValues).toEqual([confirmationRequiredJson]);
   });
 
   test("delete requires yes when no prompt can be shown", async () => {
@@ -406,7 +352,7 @@ describe("cli commands", () => {
     expect(harness.jsonValues).toEqual([
       {
         deleted: ["API_KEY"],
-        scope: { owner: "acme", repo: "app" },
+        scope: repoScope,
       },
     ]);
   });

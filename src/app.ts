@@ -29,6 +29,10 @@ type ConfirmConfig = {
   requireYesWithoutPrompt?: boolean;
 };
 
+const requireYesWithoutPrompt = {
+  requireYesWithoutPrompt: true,
+} satisfies ConfirmConfig;
+
 type CliDependencies = {
   confirmAction: typeof confirmAction;
   isInteractiveSession: typeof isInteractiveSession;
@@ -45,14 +49,21 @@ const defaultDependencies: CliDependencies = {
   isInteractiveSession,
   printJson,
   printLine,
-  readOptionalStdin: async () =>
-    process.stdin.isTTY ? null : await readStdin(),
+  readOptionalStdin: () =>
+    process.stdin.isTTY ? Promise.resolve(null) : readStdin(),
   resolveRuntime,
   resolveSecretValue,
   writeStderr: (value) => {
     process.stderr.write(value);
   },
 };
+
+const resolveDependencies = (
+  overrides: Partial<CliDependencies> = {}
+): CliDependencies => ({
+  ...defaultDependencies,
+  ...overrides,
+});
 
 const createStringArrayOption = () => ({
   default: [] as string[],
@@ -110,11 +121,7 @@ const hasScopedDeleteFilters = (options: {
   prefix?: string;
 }) => Boolean(options.prefix || options.include?.length);
 
-const createCli = (overrides: Partial<CliDependencies> = {}) => {
-  const dependencies = {
-    ...defaultDependencies,
-    ...overrides,
-  } satisfies CliDependencies;
+const createCli = (dependencies: CliDependencies) => {
   const cli = cac("gh-secrets");
 
   cli
@@ -192,9 +199,7 @@ const createCli = (overrides: Partial<CliDependencies> = {}) => {
           dependencies,
           options,
           `Secret ${secretName} already exists in ${scope}. Overwrite it?`,
-          {
-            requireYesWithoutPrompt: true,
-          }
+          requireYesWithoutPrompt
         );
       }
 
@@ -305,23 +310,21 @@ const createCli = (overrides: Partial<CliDependencies> = {}) => {
         );
       }
 
-      const changes: string[] = [];
-      if (updateCount > 0) {
-        changes.push(`update ${formatCount(updateCount, "existing secret")}`);
-      }
-
-      if (plan.deletes.length > 0) {
-        changes.push(`delete ${formatCount(plan.deletes.length, "secret")}`);
-      }
+      const changes = [
+        updateCount
+          ? `update ${formatCount(updateCount, "existing secret")}`
+          : null,
+        plan.deletes.length
+          ? `delete ${formatCount(plan.deletes.length, "secret")}`
+          : null,
+      ].filter((value): value is string => Boolean(value));
 
       if (changes.length > 0) {
         await ensureConfirmed(
           dependencies,
           options,
           `This will ${changes.join(" and ")} in ${scope}. Continue?`,
-          {
-            requireYesWithoutPrompt: true,
-          }
+          requireYesWithoutPrompt
         );
       }
 
@@ -352,9 +355,7 @@ const createCli = (overrides: Partial<CliDependencies> = {}) => {
         dependencies,
         options,
         `Delete ${formatCount(secretNames.length, "secret")} from ${scope}?`,
-        {
-          requireYesWithoutPrompt: true,
-        }
+        requireYesWithoutPrompt
       );
 
       for (const name of secretNames) {
@@ -379,10 +380,7 @@ export const runCli = async (
   argv = process.argv,
   overrides: Partial<CliDependencies> = {}
 ) => {
-  const dependencies = {
-    ...defaultDependencies,
-    ...overrides,
-  } satisfies CliDependencies;
+  const dependencies = resolveDependencies(overrides);
   const cli = createCli(dependencies);
   const wantsJsonOutput = argv.includes("--json");
 

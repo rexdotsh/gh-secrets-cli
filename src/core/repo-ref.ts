@@ -34,12 +34,10 @@ const buildRepoRef = (owner: string, repo: string): RepoRef | null => {
   };
 };
 
-export const formatRepoRef = ({ owner, repo }: RepoRef) => `${owner}/${repo}`;
-
-export const parseRepoRef = (value: string): RepoRef | null =>
+const parseRepoRef = (value: string): RepoRef | null =>
   parseRepoParts(value.trim().split("/"));
 
-export const parseGitHubRepoUrl = (value: string): RepoRef | null => {
+const parseGitHubRepoUrl = (value: string): RepoRef | null => {
   const trimmed = value.trim();
   const sshMatch =
     /^git@github\.com:(?<owner>[^/]+)\/(?<repo>[^/]+?)(?:\.git)?$/u.exec(
@@ -71,7 +69,7 @@ const parseRepoCandidate = (value?: string | null) => {
     return null;
   }
 
-  return parseRepoRef(value) ?? parseGitHubRepoUrl(value);
+  return parseGitHubRepoUrl(value) ?? parseRepoRef(value);
 };
 
 const readGitRemoteUrl = (name: string) => {
